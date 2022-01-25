@@ -1,8 +1,7 @@
 library(maptools)
 library(lubridate)
-
-# adapted from http://r.789695.n4.nabble.com/maptools-sunrise-sunset-function-td874148.html
-ephemeris <- function(lat, lon, date, span=1, tz="UTC") {
+library(plotly)
+ephemeris <- function(lat, lon,name="", date, span=1, tz="UTC") {
   
   # convert to the format we need
   lon.lat <- matrix(c(lon, lat), nrow=1)
@@ -17,23 +16,52 @@ ephemeris <- function(lat, lon, date, span=1, tz="UTC") {
   solar_noon <- solarnoon(lon.lat, sequence, POSIXct.out=TRUE)
   
   # build a data frame from the vectors
-  data.frame(date=as.Date(sunrise$time),
+  data.frame(name=name,date=as.Date(sunrise$time),
              sunrise=format(sunrise$time, "%H%M"),
              solarnoon=format(solar_noon$time, "%H%M"),
              sunset=format(sunset$time, "%H%M"),
              day_length=as.numeric(difftime(sunset$time,sunrise$time,units="hours")))
   
 }
-lat=55.860916, lon=-4.251433
-
+create_buttons <- function(df, y_axis_var_names) {
+  lapply(
+    y_axis_var_names,
+    FUN = function(var_name, df) {
+      button <- list(
+        method = 'restyle',
+        args = list('y', list(df[df$name==var_name,c("sunrise","sunset","day_length") ])),
+        label = sprintf(var_name)
+      )
+    },
+    df
+  )
+  
+}
 
 # these functions need the lat/lon in an unusual format
-data=ephemeris(lat=-80, lon=0, date=Sys.Date(), span=365, tz="Europe/London")
+locations=data.frame(lat=c(56.708861334605054,
+                           55.860210237849415,
+                           51.51247642759147),
+                     lon=c(-5.713564551768571,
+                           -4.255987857346223,
+                           -0.12889642997756387),
+                     name=c("Ardnamurchan",
+                            "Glasgow",
+                            "London"))
+
+
+data=rbindlist(lapply(1:nrow(locations),function(i){ephemeris(lat=locations$lat[i],
+                                                              lon=locations$lon[i],
+                                                              name=locations$name[i],
+                                                              date=Sys.Date(), 
+                                                              span=365,
+                                                              tz="Europe/London")}))
 data$day_length_diff_hours=diff(c(NA,data$day_length))
 data$day_length_diff_min=data$day_length_diff*60
-data
-plot(data$sunset~data$date)
 
+              
+
+data=data[data$name=="Glasgow",]
 
 
 fig <- plot_ly(data,  type = 'scatter', mode = 'lines+markers', fill = 'tozeroy')%>%
@@ -44,33 +72,18 @@ fig <- plot_ly(data,  type = 'scatter', mode = 'lines+markers', fill = 'tozeroy'
             paste0("<br>Sunset: ",data$sunset)))%>%
   
   layout(showlegend = F)%>%layout(
-    title = "Daylight hours",
+    title = "Daylight hours (Glasgow)",   
     xaxis = list(
       rangeselector = list(
         buttons = list(
-          list(
-            count = 3,
-            label = "3 mo",
-            step = "month",
-            stepmode = "todate"),
-          list(
-            count = 6,
-            label = "6 mo",
-            step = "month",
-            stepmode = "todate"),
-          list(
-            count = 1,
-            label = "1 yr",
-            step = "year",
-            stepmode = "todate"),
-          list(
-            count = 1,
-            label = "YTD",
-            step = "year",
-            stepmode = "todate"),
-          list(step = "all"))),
+          list(step = "all",label="Reset"))),
       
       rangeslider = list(type = "date")),
     
     yaxis = list(title = "Daylight hours"))
 fig
+
+
+
+
+
